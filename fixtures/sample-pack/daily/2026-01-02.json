@@ -1,0 +1,7 @@
+{
+  "formatVersion": 1, "packId": "sample-shapes", "date": "2026-01-02",
+  "items": [],
+  "questions": [
+    { "id": "sample-05", "itemId": "s02", "type": "choice", "prompt": "有三個角的是？", "options": ["圓形", "三角形", "四邊形"], "answer": "三角形", "explanation": "三角形有三個角。" }
+  ]
+}

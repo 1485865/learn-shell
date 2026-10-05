@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1,
+  "id": "sample-shapes",
+  "name": "圖形示範",
+  "version": "1",
+  "locale": "zh-TW",
+  "timezone": "Asia/Taipei",
+  "itemLabel": "圖形",
+  "questionTypes": ["choice", "audio-choice", "input", "cloze"],
+  "capabilities": ["tts"],
+  "daily": { "newItems": 2, "maxReviews": 4 }
+}

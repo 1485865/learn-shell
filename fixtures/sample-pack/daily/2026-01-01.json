@@ -1,0 +1,13 @@
+{
+  "formatVersion": 1, "packId": "sample-shapes", "date": "2026-01-01",
+  "items": [
+    { "id": "s01", "front": "圓形", "back": "沒有角的封閉圖形", "fields": { "觀察": "邊界彎曲", "補充": "<b>這段資料只以文字顯示</b>" } },
+    { "id": "s02", "front": "三角形", "back": "有三個角的圖形", "fields": { "邊數": "三" } }
+  ],
+  "questions": [
+    { "id": "sample-01", "itemId": "s01", "type": "choice", "prompt": "哪個圖形沒有角？", "options": ["圓形", "三角形", "四邊形"], "answer": "圓形", "explanation": "圓形的邊界彎曲，沒有角。" },
+    { "id": "sample-02", "itemId": "s02", "type": "audio-choice", "speak": "三角形", "options": ["圓形", "三角形", "四邊形"], "answer": "三角形", "explanation": "題目讀的是三角形。" },
+    { "id": "sample-03", "itemId": "s02", "type": "input", "prompt": "有三個角的圖形叫什麼？", "answer": "三角形", "explanation": "有三個角的圖形叫三角形。" },
+    { "id": "sample-04", "itemId": "s01", "type": "cloze", "prompt": "___ 沒有角。", "options": ["圓形", "三角形", "四邊形"], "answer": "圓形", "explanation": "圓形沒有角。" }
+  ]
+}

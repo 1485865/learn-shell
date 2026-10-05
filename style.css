@@ -1,0 +1,15 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; font-size: 18px; background: Canvas; color: CanvasText; }
+* { box-sizing: border-box; }
+body { margin: auto; max-width: 42rem; padding: 1rem 1rem 6rem; }
+h1 { font-size: 1.3rem; } h2 { font-size: 1.2rem; }
+header { border-bottom: 1px solid GrayText; } #status { min-height: 1.5rem; }
+main { min-height: 55vh; padding-block: 1rem; } p { overflow-wrap: anywhere; }
+button, input, select { font: inherit; border: 1px solid GrayText; border-radius: .3rem; padding: .65rem; color: CanvasText; background: Canvas; }
+button { min-height: 48px; cursor: pointer; } button:disabled { opacity: .5; cursor: default; }
+label { display: block; margin-block: .8rem; } label input, label select { display: block; width: 100%; margin-top: .3rem; }
+.actions { display: grid; gap: .7rem; margin-top: 2rem; } .primary { background: Highlight; color: HighlightText; }
+nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, 42rem); display: grid; grid-template-columns: repeat(4, 1fr); gap: .3rem; padding: .5rem; background: Canvas; border-top: 1px solid GrayText; }
+nav button[aria-current="page"] { outline: 2px solid Highlight; }
+dl { display: grid; grid-template-columns: minmax(5rem, 1fr) 2fr; gap: .5rem; } dt, dd { margin: 0; overflow-wrap: anywhere; }
+.card { padding: 1rem; border: 1px solid GrayText; border-radius: .4rem; } .front { font-size: 1.5rem; }
+fieldset { margin-block: 1rem; border: 1px solid GrayText; } :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }
