@@ -1,0 +1,6 @@
+.env
+.review/
+*.keystore
+*.jks
+*.pem
+node_modules/
