@@ -28,23 +28,25 @@ export async function readPackFile(source, path, pat = '', fetcher = fetch) {
   try { response = await fetcher(url, { headers, credentials: 'omit', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(20000) }); }
   catch { throw new Error('無法讀取題庫：請檢查連線、跨來源權限或重新導向設定'); }
   if (!response.ok) {
-    const messages = { 401: 'PAT 無效，請重新設定', 403: '權限不足或請求額度已用完，請檢查 Contents 讀取權限', 404: '找不到題庫檔案，請檢查來源、分支與 private repo 的存取權' };
+    const messages = source.kind === 'github'
+      ? { 401: 'PAT 無效，請重新設定', 403: '權限不足或請求額度已用完，請檢查 Contents 讀取權限', 404: '找不到題庫檔案，請檢查來源、分支與 private repo 的存取權' }
+      : { 401: '題庫網址需要授權，請使用可公開讀取的網址', 403: '無權存取題庫網址，請檢查伺服器的公開存取設定', 404: '找不到題庫檔案，請檢查公開網址與檔案路徑' };
     throw new Error(messages[response.status] ?? '題庫伺服器回應失敗，請稍後重試');
   }
-  try { return await response.json(); } catch { throw new Error('題庫檔案不是有效的 JSON'); }
+  try { return await response.json(); } catch { throw new Error(`題庫格式錯誤：[${path}] 必須是有效的 JSON`); }
 }
 export async function downloadPack(source, pat = '', cached = null, fetcher = fetch) {
   source = normalizeSource(source);
   const read = path => readPackFile(source, path, pat, fetcher);
   const pack = validatePack(await read('pack.json'));
-  if (cached && pack.id !== cached.pack.id) throw new Error('題庫來源的 id 已改變，保留既有資料；請另行安裝');
+  if (cached && pack.id !== cached.pack.id) throw new Error('題庫格式錯誤：[pack.json] id 不可改變，保留既有資料；請另行安裝');
   const items = validateItems(await read('items.json'));
   const index = validateIndex(await read('daily/index.json'));
   const days = Object.create(null);
   for (const date of index.dates) days[date] = cached?.days[date] ?? await read(`daily/${date}.json`);
   // 保留歷史快取，供 S2 複習使用；新版索引不能刪除既有的日期。
   if (cached) for (const date of cached.index.dates) {
-    if (!index.dates.includes(date)) throw new Error('新索引移除了既有日期，保留原題庫');
+    if (!index.dates.includes(date)) throw new Error('題庫格式錯誤：[daily/index.json] 新索引移除了既有日期，保留原題庫');
   }
   return validateBundle({ schemaVersion: 1, id: pack.id, source, pack, items, index, days });
 }

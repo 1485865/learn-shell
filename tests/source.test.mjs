@@ -23,6 +23,22 @@ test('GitHub 固定 API 網域、raw Accept、分支編碼', async () => {
 for (const [code, expected] of [[401, /PAT 無效/], [403, /權限不足/], [404, /找不到/], [500, /伺服器/]]) test(`HTTP ${code} 明確提示而不回傳敏感回應`, async () => {
   await assert.rejects(readPackFile({ kind: 'github', owner: 'sample', repo: 'pack' }, 'pack.json', fakeCredential, async () => ({ ok: false, status: code, json: async () => ({ secret: fakeCredential }) })), expected);
 });
+for (const [code, expected] of [[401, /需要授權/], [403, /無權存取/], [404, /找不到/]]) test(`網址 HTTP ${code} 提示不提 GitHub 授權`, async () => {
+  await assert.rejects(readPackFile({ kind: 'url', url: 'https://example.test/' }, 'pack.json', fakeCredential,
+    async () => ({ ok: false, status: code })), error => {
+    assert.match(error.message, expected);
+    assert.doesNotMatch(error.message, /PAT|Contents|private repo|test-only-placeholder/);
+    return true;
+  });
+});
+test('JSON 解析失敗指出檔案與規則，不顯示解析器的原文', async () => {
+  const path = 'daily/2026-01-01.json';
+  await assert.rejects(readPackFile({ kind: 'url', url: 'https://example.test/' }, path, '',
+    async () => ({ ok: true, json: async () => { throw new SyntaxError('private-file-content'); } })), error => {
+    assert.ok(error.message.includes(path)); assert.match(error.message, /有效的 JSON/);
+    assert.doesNotMatch(error.message, /private-file-content/); return true;
+  });
+});
 test('網路例外與 JSON 例外不洩漏憑證', async () => {
   for (const fetcher of [async () => { throw new Error(fakeCredential); }, async () => ({ ok: true, json: async () => { throw new Error(fakeCredential); } })]) {
     await assert.rejects(readPackFile({ kind: 'url', url: 'https://example.test/' }, 'pack.json', fakeCredential, fetcher), error => !error.message.includes(fakeCredential));

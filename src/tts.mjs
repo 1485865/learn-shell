@@ -18,8 +18,24 @@ export async function speak(text, pack, rate, slow = false) {
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = pack.locale; utterance.voice = voice; utterance.rate = slow ? rate * 0.65 : rate;
   return new Promise(resolve => {
-    utterance.onend = () => resolve('');
-    utterance.onerror = () => resolve('發音失敗，請檢查裝置語音設定');
-    synth.speak(utterance);
+    let settled = false, started = false;
+    let timer;
+    const finish = (message, cancel = false) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      utterance.onstart = utterance.onend = utterance.onerror = null;
+      if (cancel) { try { synth.cancel(); } catch { /* 取消失敗仍恢復介面。 */ } }
+      resolve(message);
+    };
+    timer = setTimeout(() => finish('發音未能開始，請檢查裝置語音設定後重試', true), 5000);
+    utterance.onstart = () => {
+      if (settled || started) return;
+      started = true; clearTimeout(timer);
+      timer = setTimeout(() => finish('發音逾時，已停止播放，請重試', true), 30000);
+    };
+    utterance.onend = () => finish('');
+    utterance.onerror = () => finish('發音失敗，請檢查裝置語音設定');
+    try { synth.speak(utterance); }
+    catch { finish('發音失敗，請檢查裝置語音設定', true); }
   });
 }

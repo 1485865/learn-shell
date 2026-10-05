@@ -69,3 +69,23 @@ test('輸入比對忽略大小寫及前後空白', () => {
 });
 test('空每日資料直接完成，不索引不存在的卡片', () => assert.equal(createSession({ date: index.dates[0], items: [], questions: [] }).phase, 'complete'));
 test('沒有 capabilities 的欄位不能省略', () => { const p = structuredClone(pack); delete p.capabilities; assert.throws(() => validatePack(p)); });
+for (const [file, rule, mutate] of [
+  ['pack.json', /locale/, b => b.pack.locale = 'private-file-content!'],
+  ['pack.json', /timezone/, b => b.pack.timezone = 'private-file-content'],
+  ['pack.json', /daily.maxReviews/, b => b.pack.daily.maxReviews = 'private-file-content'],
+  ['items.json', /\[0\].*fields/, b => b.items[0].fields = 'private-file-content'],
+  ['daily/index.json', /dates\[0\].*有效日期/, b => b.index.dates[0] = 'private-file-content'],
+  ['daily/2026-01-01.json', /items\[0\].*front/, b => b.days[index.dates[0]].items[0].front = {}],
+  ['daily/2026-01-01.json', /questions\[0\].*explanation/, b => {
+    const q = b.days[index.dates[0]].questions[0]; q.id = 'private-file-content'; q.prompt = 'private-file-content'; delete q.explanation;
+  }],
+  ['daily/2026-01-01.json', /questions\[0\].*options/, b => b.days[index.dates[0]].questions[0].options = ['private-file-content']],
+  ['daily/2026-01-01.json', /daily 必須是物件/, b => delete b.days[index.dates[0]]],
+  ['daily/2026-01-02.json', /questions\[0\].*跨日重複/, b => b.days[index.dates[1]].questions[0].id = b.days[index.dates[0]].questions[0].id]
+]) test(`驗證定位 ${file} ${rule}`, () => {
+  const b = structuredClone(bundle); mutate(b);
+  assert.throws(() => validateBundle(b), error => {
+    assert.ok(error.message.includes(`[${file}]`)); assert.match(error.message, rule);
+    assert.doesNotMatch(error.message, /private-file-content/); return true;
+  });
+});

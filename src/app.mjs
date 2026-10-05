@@ -98,7 +98,7 @@ function showQuiz() {
 async function install(source) {
   message('正在下載並驗證題庫……');
   const record = await downloadPack(source, await storage.getSetting('pat') ?? '');
-  if (packs.some(pack => pack.id === record.id)) throw new Error('此題庫已安裝，請使用重新檢查題庫');
+  if (packs.some(pack => pack.id === record.id)) throw new Error('此題庫已安裝，每次開啟時會自動檢查更新');
   await storage.putPack(record);
   // 介面使用的內容也重新從 IndexedDB 取得。
   packs = await storage.listPacks(); selected = record.id;
@@ -120,7 +120,6 @@ function showSettings() {
       message('題庫已移除。');
     });
   }
-  button('重新檢查題庫', refresh, actions());
   node('h3', '安裝題庫');
   const form = node('form');
   const label = node('label', '來源', form); const kind = node('select', undefined, label);
@@ -131,7 +130,6 @@ function showSettings() {
   kind.addEventListener('change', () => { publicFields.hidden = kind.value !== 'url'; repoFields.hidden = kind.value !== 'github'; });
   const submit = node('button', '安裝', form); submit.type = 'submit';
   form.addEventListener('submit', event => { event.preventDefault(); const source = kind.value === 'url' ? { kind: 'url', url: url.value.trim() } : { kind: 'github', owner: owner.value.trim(), repo: repo.value.trim(), branch: branch.value }; void guarded(() => install(source)); });
-  button('載入示範題庫', () => install({ kind: 'url', url: new URL('../fixtures/sample-pack/', import.meta.url).href }), actions());
   node('h3', '共用 GitHub PAT');
   node('p', 'PAT 只存本機 IndexedDB，僅送往 GitHub API。題庫需 Contents 唯讀；未來進度同步需 Contents 讀寫。');
   const patForm = node('form'); const credential = field('PAT（留空可清除）', '', patForm, 'password'); credential.autocomplete = 'off';
