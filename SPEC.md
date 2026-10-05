@@ -12,7 +12,7 @@
 
 - vanilla JS，零外部依賴，不用框架、不用 CDN、不用建置工具
 - 部署：GitHub Pages（純靜態）
-- 測試：Node 20 內建的 `node --test`，不裝 npm 套件
+- 測試：Node 24（目前的 LTS）內建的 `node --test`，不裝 npm 套件
 - 任何 token 都不得出現在 repo 中
 - 排程、進度合併、日期計算必須是不碰 DOM 的純函式模組，才能被測試
 - 不可修改 `PACK-FORMAT.md`
@@ -33,16 +33,20 @@
 
 ### 1. Pack 管理
 
-- 設定頁以 base URL 新增 pack；讀取 pack.json 並驗證 formatVersion 與必要欄位，不符則拒絕並說明原因
+- 設定頁新增 pack，來源二選一（見 PACK-FORMAT.md）：公開的 base URL，或 GitHub repo（owner/repo 與分支，可為 private，用 PAT 經 Contents API 讀取）
+- 讀取 pack.json 並驗證 formatVersion 與必要欄位，不符則拒絕並說明原因；401、403、404 要分別給出看得懂的提示（PAT 無效、權限不足、找不到）
+- 讀到的 pack 資料（pack.json、items.json、index.json、daily 檔）一律存入 IndexedDB，離線時從 IndexedDB 讀取；不依賴 service worker 快取 pack 資料
+- 每次開啟且有網路時，檢查 index.json 是否有新的日期並下載
 - 可安裝多個 pack、切換目前使用的 pack、移除 pack（移除前確認，進度保留）
 - 開發與測試使用 `/fixtures/sample-pack/`
 
 ### 2. 每日學習流程
 
 - 「今天」依 pack.json 的 timezone 判定
-- 一次學習 = 今日的新項目 + 到期的複習
+- 一次學習 = 一份 daily 檔的新項目 + 到期的複習
 - 流程：先看新項目卡片（front、back、fields、發音鈕）→ 作答 → 答錯立即顯示 explanation
-- 沒有今日題庫時，使用 index.json 中最近一份尚未學過的，並提示
+- 每天學的是 index.json 中**最早一份尚未學過且日期不晚於今天**的 daily 檔，而不是日曆上的今天；這樣缺席幾天也不會跳過內容。一天最多學一份
+- 沒有可學的 daily 檔時，只做到期的複習，並提示
 - 複習題來源：該項目在已快取的歷史 daily 檔中的題目，隨機抽一題；沒有題目時退回「看 front 回想 back，自行評分」的卡片
 - 每日複習上限為 pack.json 的 `daily.maxReviews`，超過的順延
 - **做完就鎖住**：當日完成後顯示完成畫面，不提供加練。可以瀏覽已學項目，但不計入任何紀錄
@@ -73,6 +77,7 @@
 
 - 本機：IndexedDB，以 packId 分開
 - 同步目標：使用者自己的 **private** repo。設定頁輸入 owner/repo 與 fine-grained PAT（PAT 只存在本機 IndexedDB）
+- 整個 app 只使用一組 PAT，讀取 private pack 與同步進度共用；README 要說明這組 PAT 需要的權限（pack repo：Contents 唯讀；進度 repo：Contents 讀寫）
 - 用 GitHub Contents API 讀寫：
   - `progress/<packId>.json`：`{ "schemaVersion": 1, "items": { "<itemId>": { ...排程狀態, "speakMiss": 0 } } }`
   - `logs/<packId>/<YYYY-MM>.json`：review log 陣列
@@ -88,7 +93,7 @@
 
 ### 8. PWA
 
-- 可安裝、離線可用（app 本體與已載入的 pack 資料）
+- 可安裝、離線可用（app 本體由 service worker 快取；pack 資料來自 IndexedDB）
 - service worker 更新策略必須避免使用者卡在舊版：有新版時提示重新載入
 
 ### 9. 介面原則
@@ -109,10 +114,12 @@
 | S3 | 統計、連續天數、週測驗 |
 | S4 | 同步到 private repo |
 | S5 | PWA、錯誤紀錄、備份、schemaVersion 遷移、README |
-| S6 | Android APK（TWA） |
+| S6 | Android APK（TWA）：**暫緩**，使用者明確指示後才可開始 |
 | S7 | 口說練習 |
 
-S5 通過後停下來等使用者實測，使用者確認後才做 S6、S7。
+S5 通過後停下來等使用者實測。S6、S7 都要使用者明確指示後才可開始。
+
+提醒通知不由 shell 負責（由 pack 的 GitHub Actions 發送 Discord 訊息）。shell 不實作任何通知或推播功能。
 
 ### S6：Android APK（TWA）
 
@@ -147,3 +154,4 @@ S5 通過後停下來等使用者實測，使用者確認後才做 S6、S7。
 - pack 資料是否被當成不可信輸入（壞的 pack 不可讓 app 當掉或執行其中的 HTML）
 - service worker 是否會讓使用者卡在舊版
 - PAT 是否只存在 IndexedDB，沒有出現在網址、log、錯誤紀錄、備份匯出檔中
+- PAT 只能送往 `api.github.com`；以網址為來源的 pack 請求不可帶上 PAT

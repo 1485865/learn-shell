@@ -12,7 +12,10 @@
 /daily/YYYY-MM-DD.json
 ```
 
-pack 以靜態檔案形式託管（GitHub Pages）。shell 只知道 pack 的 base URL。
+pack 是一組靜態檔案，shell 支援兩種來源，檔案的相對路徑相同：
+
+- **網址**：一個公開的 base URL（例如 GitHub Pages）
+- **GitHub repo**：`owner/repo` 與分支（預設 `main`），可以是 private；shell 以 GitHub Contents API 加上使用者的 PAT 讀取，請求時帶 `Accept: application/vnd.github.raw` 取得原始內容
 
 ## pack.json
 
