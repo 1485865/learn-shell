@@ -2,12 +2,13 @@ import { openStorage } from './storage.mjs';
 import { downloadPack } from './pack-source.mjs';
 import { todayInZone, earliestUnlearned } from './core/dates.mjs';
 import { createSession, nextCard, answerQuestion, nextQuestion } from './core/session.mjs';
-import { speak, voiceDiagnostics } from './tts.mjs';
+import { speak, voiceDiagnostics, languageVoices, voiceKey, resolveVoice, voiceSettingKey } from './tts.mjs';
 const screen = document.querySelector('#screen');
 const status = document.querySelector('#status');
 let storage, packs = [], selected, page = 'today', session = null, busy = false, rate = 1;
 // S1 場次只存在記憶體；S2 接入逐包進度與每日鎖定的持久化。
 const learned = new Map(), finished = new Map();
+const voicePreferences = new Map();
 function node(tag, text, parent = screen) {
   const element = document.createElement(tag);
   if (text !== undefined) element.textContent = text;
@@ -35,8 +36,8 @@ function packToday(record) { return todayInZone(Date.now(), record.pack.timezone
 function actions() { const el = node('div'); el.className = 'actions'; return el; }
 function speechButtons(text, record, parent) {
   if (!record.pack.capabilities.includes('tts')) return;
-  button('播放發音', async () => message(await speak(text, record.pack, rate)), parent);
-  button('慢速播放', async () => message(await speak(text, record.pack, rate, true)), parent);
+  button('播放發音', async () => message(await speak(text, record.pack, rate, false, voicePreferences.get(record.id))), parent);
+  button('慢速播放', async () => message(await speak(text, record.pack, rate, true, voicePreferences.get(record.id))), parent);
 }
 function showToday() {
   const record = current(); node('h2', record?.pack.name ?? '今日');
@@ -100,6 +101,7 @@ async function install(source) {
   const record = await downloadPack(source, await storage.getSetting('pat') ?? '');
   if (packs.some(pack => pack.id === record.id)) throw new Error('此題庫已安裝，每次開啟時會自動檢查更新');
   await storage.putPack(record);
+  voicePreferences.set(record.id, await storage.getSetting(voiceSettingKey(record.id)) ?? null);
   // 介面使用的內容也重新從 IndexedDB 取得。
   packs = await storage.listPacks(); selected = record.id;
   await storage.putSetting('selected', selected); session = null; page = 'today'; message('題庫已儲存，可離線學習。');
@@ -120,6 +122,7 @@ function updateVoiceDiagnostics() {
 function showSettings() {
   node('h2', '設定');
   node('section').id = 'voice-diagnostics'; updateVoiceDiagnostics();
+  node('section').id = 'voice-selection'; updateVoiceSelection();
   if (!storage) { node('p', '本機資料庫不可用，請檢查瀏覽器儲存權限後重新載入。'); return; }
   node('h3', '已安裝題庫');
   for (const record of packs) {
@@ -154,6 +157,35 @@ function showSettings() {
   const font = field('字體大小（16–28）', String(parseInt(document.documentElement.style.fontSize) || 18), screen, 'range'); font.min = '16'; font.max = '28';
   font.addEventListener('change', () => void guarded(async () => { document.documentElement.style.fontSize = `${font.value}px`; await storage.putSetting('font', Number(font.value)); }));
 }
+function updateVoiceSelection() {
+  const panel = document.getElementById('voice-selection');
+  if (!panel) return;
+  panel.replaceChildren(); node('h3', '語音選擇', panel);
+  const record = current();
+  if (!record) { node('p', '尚未選擇題庫', panel); return; }
+  if (!record.pack.capabilities.includes('tts')) { node('p', '此題庫未啟用發音', panel); return; }
+  const synth = globalThis.speechSynthesis;
+  if (!synth) { node('p', '此瀏覽器不支援發音', panel); return; }
+  const voices = synth.getVoices();
+  const preference = voicePreferences.get(record.id);
+  const resolved = resolveVoice(voices, record.pack.locale, preference);
+  const label = node('label', '目前題庫的語音', panel);
+  const select = node('select', undefined, label); select.disabled = busy;
+  const auto = node('option', '自動', select); auto.value = '';
+  for (const voice of languageVoices(voices, record.pack.locale)) {
+    const option = node('option', `${voice.name || '未命名語音'}（${voice.lang}）`, select);
+    option.value = voiceKey(voice);
+  }
+  select.value = resolved.fallback ? '' : preference ?? '';
+  if (resolved.fallback) node('p', '選定的語音在此裝置上不存在，已退回自動。', panel);
+  select.addEventListener('change', () => void guarded(async () => {
+    const value = select.value || null;
+    await storage.putSetting(voiceSettingKey(record.id), value); voicePreferences.set(record.id, value);
+  }));
+  const preview = record.items[0]?.front ?? record.pack.name;
+  const listen = button('試聽', async () => message(await speak(preview, record.pack, rate, false, voicePreferences.get(record.id))), panel);
+  listen.disabled = busy || !preview;
+}
 async function refresh() {
   if (!navigator.onLine) { message('目前離線，使用已儲存的題庫。'); return; }
   const pat = await storage.getSetting('pat') ?? '';
@@ -175,8 +207,10 @@ for (const nav of document.querySelectorAll('nav button')) nav.addEventListener(
 window.addEventListener('online', () => void guarded(refresh));
 window.addEventListener('offline', () => message('目前離線，已儲存的題庫仍可使用。'));
 globalThis.speechSynthesis?.addEventListener('voiceschanged', updateVoiceDiagnostics);
+globalThis.speechSynthesis?.addEventListener('voiceschanged', updateVoiceSelection);
 async function start() {
   storage = await openStorage(); packs = await storage.listPacks();
+  for (const record of packs) voicePreferences.set(record.id, await storage.getSetting(voiceSettingKey(record.id)) ?? null);
   selected = await storage.getSetting('selected'); if (!packs.some(pack => pack.id === selected)) selected = packs[0]?.id;
   rate = await storage.getSetting('rate') ?? 1;
   document.documentElement.style.fontSize = `${await storage.getSetting('font') ?? 18}px`;

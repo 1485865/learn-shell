@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { speak, matchingVoice, voiceDiagnostics } from '../src/tts.mjs';
+import { speak, matchingVoice, voiceDiagnostics, languageVoices, voiceKey, resolveVoice, voiceSettingKey } from '../src/tts.mjs';
 const pack = JSON.parse(await readFile(new URL('../fixtures/sample-pack/pack.json', import.meta.url), 'utf8'));
 const fixture = JSON.parse(await readFile(new URL('../fixtures/voices.json', import.meta.url), 'utf8'));
 function engine(t) {
@@ -98,4 +98,43 @@ test('無指定語音開始後逾時仍使用播放逾時提示', async t => {
   const { synth, calls } = engine(t); synth.getVoices = () => [fixture.voices[0]];
   const result = speak('內容', pack, 1); calls[0].onstart(); t.mock.timers.tick(30000);
   assert.match(await result, /發音逾時/);
+});
+test('可選清單包含同語言所有地區，排除其他語言與無效資料', () => {
+  const voices = [{lang:pack.locale,name:'Exact'}, {lang:fixture.regional,name:'Regional'}, {lang:fixture.variants[0],name:'Alternative'}, fixture.voices[0], {}, null];
+  assert.deepEqual(languageVoices(voices, pack.locale), voices.slice(0,3));
+  assert.deepEqual(languageVoices(voices, null), []);
+});
+test('使用者選擇優先於自動；缺少或不同語言的選擇退回自動', () => {
+  const exact = {lang:pack.locale,name:'Exact',voiceURI:'one'}, region = {lang:fixture.regional,name:'Regional',voiceURI:'two'};
+  assert.deepEqual(resolveVoice([exact,region],pack.locale), {voice:exact,fallback:false});
+  assert.deepEqual(resolveVoice([exact,region],pack.locale,voiceKey(region)), {voice:region,fallback:false});
+  assert.deepEqual(resolveVoice([exact],pack.locale,voiceKey(region)), {voice:exact,fallback:true});
+  assert.deepEqual(resolveVoice([],pack.locale,voiceKey(region)), {voice:undefined,fallback:true});
+  assert.equal(resolveVoice([exact,fixture.voices[0]],pack.locale,voiceKey(fixture.voices[0])).fallback,true);
+});
+test('同語言多個語音可分辨，儲存鍵依題庫隔離', () => {
+  const a={lang:pack.locale,name:'A',voiceURI:'a'}, b={...a,name:'B',voiceURI:'b'};
+  assert.notEqual(voiceKey(a),voiceKey(b));
+  assert.equal(resolveVoice([a,b],pack.locale,voiceKey(b)).voice,b);
+  assert.notEqual(voiceSettingKey('pack-a'),voiceSettingKey('pack-b'));
+  assert.notEqual(voiceSettingKey('pat'),'pat');
+});
+test('一般與慢速播放都採用選擇，保留題庫的原始 locale', async t => {
+  const {synth,calls}=engine(t); const chosen={lang:fixture.regional,name:'Selected',voiceURI:'selected'};
+  synth.getVoices=()=>[{lang:pack.locale},chosen];
+  for (const slow of [false,true]) {
+    const result=speak('內容',pack,1.2,slow,voiceKey(chosen));
+    const utterance=calls.at(-1); assert.equal(utterance.voice,chosen); assert.equal(utterance.lang,pack.locale);
+    assert.equal(utterance.rate,slow?1.2*.65:1.2); utterance.onend(); assert.equal(await result,'');
+  }
+});
+test('選定語音消失：成功播放自動語音仍提示備援', async t => {
+  const {calls}=engine(t); const result=speak('內容',pack,1,false,'missing-selection');
+  assert.equal(calls[0].voice.lang,pack.locale); calls[0].onend(); assert.match(await result,/已退回自動/);
+});
+test('選定語音消失且沒有符合語音：交給系統，失敗訊息保留備援提示', async t => {
+  const {synth,calls}=engine(t); synth.getVoices=()=>[fixture.voices[0]];
+  const result=speak('內容',pack,1,false,'missing-selection');
+  assert.equal(Object.hasOwn(calls[0],'voice'),false); calls[0].onerror();
+  const message=await result; assert.match(message,/已退回自動/); assert.ok(message.includes(pack.locale));
 });
