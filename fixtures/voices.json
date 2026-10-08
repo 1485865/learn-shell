@@ -1,1 +1,4 @@
-{ "voices": [{ "lang": "ja-JP" }, { "lang": "zh-TW" }], "missingLocale": "fr-FR" }
+{
+  "voices": [{ "lang": "ja-JP" }, { "lang": "zh-TW" }], "missingLocale": "fr-FR",
+  "variants": ["zh_TW", "ZH-tw", "zh_tw"], "regional": "zh_CN", "otherRegion": "zh-CN", "distinctLanguage": "cmn-Hant-TW"
+}

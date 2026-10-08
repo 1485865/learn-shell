@@ -80,7 +80,7 @@ test('TTS 無支援或題庫未啟用時有明確提示', async () => {
   assert.match(await speak('內容', { ...samplePack, capabilities: [] }, 1), /未啟用/);
   assert.match(await speak('內容', samplePack, 1), /不支援/);
 });
-test('TTS 使用題庫語言、可調語速與慢速；缺語音有提示', async () => {
+test('TTS 使用題庫語言、可調語速與慢速；無符合語音時由系統選擇', async () => {
   const originalSynth = globalThis.speechSynthesis, originalUtterance = globalThis.SpeechSynthesisUtterance;
   const calls = [];
   globalThis.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
@@ -89,6 +89,7 @@ test('TTS 使用題庫語言、可調語速與慢速；缺語音有提示', asyn
     assert.equal(await speak('內容', samplePack, 1.2), '');
     assert.equal(await speak('內容', samplePack, 1.2, true), '');
     assert.equal(calls[0].lang, samplePack.locale); assert.equal(calls[0].rate, 1.2); assert.equal(calls[1].rate, 1.2 * .65);
-    assert.match(await speak('內容', { ...samplePack, locale: voiceFixture.missingLocale }, 1), /沒有.*語音/);
+    assert.equal(await speak('內容', { ...samplePack, locale: voiceFixture.missingLocale }, 1), '');
+    assert.equal(Object.hasOwn(calls[2], 'voice'), false);
   } finally { globalThis.speechSynthesis = originalSynth; globalThis.SpeechSynthesisUtterance = originalUtterance; }
 });

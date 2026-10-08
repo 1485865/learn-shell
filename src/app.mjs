@@ -2,7 +2,7 @@ import { openStorage } from './storage.mjs';
 import { downloadPack } from './pack-source.mjs';
 import { todayInZone, earliestUnlearned } from './core/dates.mjs';
 import { createSession, nextCard, answerQuestion, nextQuestion } from './core/session.mjs';
-import { speak } from './tts.mjs';
+import { speak, voiceDiagnostics } from './tts.mjs';
 const screen = document.querySelector('#screen');
 const status = document.querySelector('#status');
 let storage, packs = [], selected, page = 'today', session = null, busy = false, rate = 1;
@@ -104,8 +104,22 @@ async function install(source) {
   packs = await storage.listPacks(); selected = record.id;
   await storage.putSetting('selected', selected); session = null; page = 'today'; message('題庫已儲存，可離線學習。');
 }
+function updateVoiceDiagnostics() {
+  const panel = document.getElementById('voice-diagnostics');
+  if (!panel) return;
+  panel.replaceChildren(); node('h3', '語音診斷', panel);
+  const synth = globalThis.speechSynthesis;
+  if (!synth) { node('p', '此瀏覽器不支援發音', panel); return; }
+  const data = voiceDiagnostics(synth.getVoices(), current()?.pack.locale);
+  node('p', `裝置語音數量：${data.count}`, panel);
+  node('p', data.locale ? `目前題庫要求的語言：${data.locale}` : '尚未選擇題庫', panel);
+  node('p', '語言代碼清單：', panel);
+  const list = node('ul', undefined, panel);
+  for (const lang of data.langs) node('li', lang, list);
+}
 function showSettings() {
   node('h2', '設定');
+  node('section').id = 'voice-diagnostics'; updateVoiceDiagnostics();
   if (!storage) { node('p', '本機資料庫不可用，請檢查瀏覽器儲存權限後重新載入。'); return; }
   node('h3', '已安裝題庫');
   for (const record of packs) {
@@ -160,6 +174,7 @@ function render() {
 for (const nav of document.querySelectorAll('nav button')) nav.addEventListener('click', () => { page = nav.dataset.page; render(); });
 window.addEventListener('online', () => void guarded(refresh));
 window.addEventListener('offline', () => message('目前離線，已儲存的題庫仍可使用。'));
+globalThis.speechSynthesis?.addEventListener('voiceschanged', updateVoiceDiagnostics);
 async function start() {
   storage = await openStorage(); packs = await storage.listPacks();
   selected = await storage.getSetting('selected'); if (!packs.some(pack => pack.id === selected)) selected = packs[0]?.id;
